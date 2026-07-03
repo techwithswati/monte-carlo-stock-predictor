@@ -1,0 +1,154 @@
+---
+# =============================================================================
+# Monte Carlo Stock Predictor — Kubernetes Manifests
+# Deployment + Service + HPA
+# Compatible with: EKS, GKE, AKS, k3s
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mc-stock-predictor
+  namespace: finance
+  labels:
+    app: mc-stock-predictor
+    version: "1.0.0"
+    team: quant-devops
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mc-stock-predictor
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0          # Zero-downtime deploys
+  template:
+    metadata:
+      labels:
+        app: mc-stock-predictor
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mc-stock-predictor
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: api
+          image: ghcr.io/YOUR_GITHUB_USERNAME/monte-carlo-stock-predictor:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: LOG_FORMAT
+              value: "json"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: outputs
+              mountPath: /app/outputs
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: outputs
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: mc-stock-predictor
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mc-stock-predictor
+  namespace: finance
+  labels:
+    app: mc-stock-predictor
+spec:
+  type: ClusterIP
+  selector:
+    app: mc-stock-predictor
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mc-stock-predictor
+  namespace: finance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mc-stock-predictor
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mc-stock-predictor
+  namespace: finance
+  labels:
+    app: mc-stock-predictor

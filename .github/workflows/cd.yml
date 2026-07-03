@@ -1,0 +1,99 @@
+# =============================================================================
+# CD Pipeline — Monte Carlo Stock Predictor
+# Trigger: GitHub Release published
+# Jobs: deploy-staging → smoke-test → deploy-production
+# =============================================================================
+
+name: CD Pipeline
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "staging"
+        type: choice
+        options: [staging, production]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set Kubernetes context (staging)
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+
+      - name: Deploy to staging namespace
+        run: |
+          kubectl set image deployment/mc-stock-predictor \
+            api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -n finance-staging
+          kubectl rollout status deployment/mc-stock-predictor \
+            -n finance-staging \
+            --timeout=300s
+
+      - name: Smoke test staging
+        run: |
+          ENDPOINT=$(kubectl get svc mc-stock-predictor -n finance-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          curl --fail --retry 5 --retry-delay 5 http://$ENDPOINT/health
+
+  deploy-production:
+    name: 🏆 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment: production           # Requires manual approval gate
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set Kubernetes context (production)
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PROD }}
+
+      - name: Blue/Green image update
+        run: |
+          kubectl set image deployment/mc-stock-predictor \
+            api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }} \
+            -n finance
+          kubectl rollout status deployment/mc-stock-predictor \
+            -n finance \
+            --timeout=600s
+
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "✅ Monte Carlo Predictor ${{ github.event.release.tag_name }} deployed to *production* by ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          kubectl rollout undo deployment/mc-stock-predictor -n finance
+          echo "❌ Deployment failed — rolled back to previous version"
