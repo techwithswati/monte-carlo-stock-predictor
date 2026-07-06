@@ -17,10 +17,11 @@ import os
 import sys
 
 import matplotlib
-matplotlib.use("Agg")  # headless rendering
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
+
+matplotlib.use("Agg")
 
 # Ensure project root is on PYTHONPATH
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
