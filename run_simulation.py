@@ -87,21 +87,43 @@ def plot_simulation(result, output_dir: str) -> str:
         ax1.plot(x, paths[idx], alpha=0.04, lw=0.5, color=PALETTE["accent"])
 
     pcts = [5, 25, 50, 75, 95]
-    colours = [PALETTE["red"], PALETTE["orange"], PALETTE["accent"],
-               PALETTE["orange"], PALETTE["green"]]
+    colours = [
+        PALETTE["red"],
+        PALETTE["orange"],
+        PALETTE["accent"],
+        PALETTE["orange"],
+        PALETTE["green"],
+    ]
     for pct, col in zip(pcts, colours):
         pct_path = np.percentile(paths, pct, axis=0)
         ax1.plot(x, pct_path, lw=2, color=col, label=f"P{pct}")
 
-    ax1.axhline(result.current_price, color=PALETTE["text"], lw=1.2, ls="--", alpha=0.6, label="Current")
-    _style_ax(ax1, f"{result.ticker} — Monte Carlo Price Paths ({result.model.upper()})",
-              "Trading Days", "Price (USD)")
+    ax1.axhline(
+        result.current_price,
+        color=PALETTE["text"],
+        lw=1.2,
+        ls="--",
+        alpha=0.6,
+        label="Current",
+    )
+    _style_ax(
+        ax1,
+        f"{result.ticker} — Monte Carlo Price Paths ({result.model.upper()})",
+        "Trading Days",
+        "Price (USD)",
+    )
     ax1.legend(loc="upper left", fontsize=8, framealpha=0.3)
 
     # ── 2. Final Price Distribution ────────────────────────────────────
     ax2 = fig.add_subplot(gs[0, 2])
-    ax2.hist(result.final_prices, bins=80, color=PALETTE["accent"], alpha=0.8,
-             orientation="horizontal", density=True)
+    ax2.hist(
+        result.final_prices,
+        bins=80,
+        color=PALETTE["accent"],
+        alpha=0.8,
+        orientation="horizontal",
+        density=True
+    )
     ax2.axhline(result.current_price, color=PALETTE["red"], lw=2, ls="--", label="Current")
     ax2.axhline(np.percentile(result.final_prices, 5), color=PALETTE["orange"],
                 lw=1.5, ls=":", label="P5 / P95")
@@ -137,10 +159,24 @@ def plot_simulation(result, output_dir: str) -> str:
              color=PALETTE["accent"], transform=ax4.transAxes)
     y -= 0.12
     for label, val in metrics.items():
-        color = (PALETTE["red"] if "VaR" in label or "Drawdown" in label
-                 else PALETTE["green"] if "Profit" in label else PALETTE["text"])
-        ax4.text(0.02, y, label, fontsize=10, color=PALETTE["text"], transform=ax4.transAxes)
-        ax4.text(0.65, y, val, fontsize=10, fontweight="bold", color=color, transform=ax4.transAxes)
+        color = (
+            PALETTE["red"]
+            if "VaR" in label or "Drawdown" in label
+            else PALETTE["green"]
+            if "Profit" in label
+            else PALETTE["text"]
+        )
+        ax4.text(
+            0.02,
+            y,
+            label,
+            fontsize=10,
+            color=PALETTE["text"],
+            transform=ax4.transAxes
+        )
+        ax4.text(
+            0.65, y, val, fontsize=10, fontweight="bold", color=color, transform=ax4.transAxes
+        )
         y -= 0.1
     ax4.set_facecolor(PALETTE["bg"])
 
@@ -161,9 +197,15 @@ def plot_simulation(result, output_dir: str) -> str:
         y -= 0.1
     ax5.set_facecolor(PALETTE["bg"])
 
-    fig.text(0.5, 0.01,
-             "⚠ For educational and research purposes only. Not financial advice.",
-             ha="center", fontsize=8, color="#6e7681", style="italic")
+    fig.text(
+        0.5,
+        0.01,
+        "⚠ For educational and research purposes only. Not financial advice.",
+        ha="center",
+        fontsize=8,
+        color="#6e7681",
+        style="italic"
+    )
 
     path = os.path.join(output_dir, f"{result.ticker}_{result.model}_simulation.png")
     plt.savefig(path, dpi=150, bbox_inches="tight", facecolor=PALETTE["bg"])
@@ -190,8 +232,9 @@ def main():
     args = parse_args()
 
     logger.info("=== Monte Carlo Stock Predictor ===")
-    logger.info("Ticker=%s | Model=%s | Days=%d | Sims=%d",
-                args.ticker, args.model, args.days, args.sims)
+    logger.info(
+        "Ticker=%s | Model=%s | Days=%d | Sims=%d", args.ticker, args.model, args.days, args.sims
+    )
 
     # Fetch market data
     market = fetch_market_data(args.ticker)
