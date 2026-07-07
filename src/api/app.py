@@ -16,7 +16,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.data.fetcher import fetch_market_data
-from src.simulation.monte_carlo import MonteCarloEngine, SimulationConfig, SimulationModel
+from src.simulation.monte_carlo import (
+    MonteCarloEngine,
+    SimulationConfig,
+    SimulationModel,
+)
 from src.utils.logger import setup_logging
 
 setup_logging()
@@ -28,7 +32,9 @@ APP_ENV = os.getenv("APP_ENV", "production")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 Monte Carlo API starting up | version=%s env=%s", APP_VERSION, APP_ENV)
+    logger.info(
+        "🚀 Monte Carlo API starting up | version=%s env=%s", APP_VERSION, APP_ENV
+    )
     yield
     logger.info("🛑 Monte Carlo API shutting down")
 
@@ -56,10 +62,15 @@ app.add_middleware(
 # Request / Response schemas
 # ---------------------------------------------------------------------------
 
+
 class SimulationRequest(BaseModel):
     ticker: str = Field(..., example="AAPL", description="Yahoo Finance ticker symbol")
-    trading_days: int = Field(252, ge=1, le=1260, description="Forecast horizon in trading days")
-    num_simulations: int = Field(10_000, ge=100, le=100_000, description="Number of Monte Carlo paths")
+    trading_days: int = Field(
+        252, ge=1, le=1260, description="Forecast horizon in trading days"
+    )
+    num_simulations: int = Field(
+        10_000, ge=100, le=100_000, description="Number of Monte Carlo paths"
+    )
     model: SimulationModel = Field(SimulationModel.GBM, description="Stochastic model")
     seed: Optional[int] = Field(42, description="Random seed for reproducibility")
 
@@ -77,6 +88,7 @@ _start_time = time.time()
 # Middleware — request timing
 # ---------------------------------------------------------------------------
 
+
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     t0 = time.perf_counter()
@@ -84,9 +96,11 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{time.perf_counter() - t0:.4f}s"
     return response
 
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health", response_model=HealthResponse, tags=["Ops"])
 async def health():
@@ -156,16 +170,22 @@ async def list_models():
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 async def _run_simulation(req: SimulationRequest) -> dict:
     logger.info(
         "Simulation request | ticker=%s model=%s days=%d sims=%d",
-        req.ticker, req.model.value, req.trading_days, req.num_simulations,
+        req.ticker,
+        req.model.value,
+        req.trading_days,
+        req.num_simulations,
     )
     try:
         market = fetch_market_data(req.ticker)
     except Exception as exc:
         logger.error("Data fetch failed | ticker=%s error=%s", req.ticker, exc)
-        raise HTTPException(status_code=400, detail=f"Failed to fetch data for '{req.ticker}': {exc}")
+        raise HTTPException(
+            status_code=400, detail=f"Failed to fetch data for '{req.ticker}': {exc}"
+        )
 
     config = SimulationConfig(
         ticker=req.ticker,

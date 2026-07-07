@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import yfinance as yf
+
     _YF_AVAILABLE = True
 except ImportError:
     _YF_AVAILABLE = False
@@ -26,8 +27,8 @@ except ImportError:
 class MarketData:
     ticker: str
     current_price: float
-    expected_return: float   # annualised
-    volatility: float        # annualised
+    expected_return: float  # annualised
+    volatility: float  # annualised
     history: Optional[pd.DataFrame] = None
     source: str = "yfinance"
 
@@ -68,13 +69,18 @@ def _fetch_yfinance(ticker: str, period: str, interval: str, rf: float) -> Marke
     mu_daily = log_returns.mean()
     sigma_daily = log_returns.std()
 
-    annualised_return = float(mu_daily * trading_days + 0.5 * (sigma_daily ** 2) * trading_days)
+    annualised_return = float(
+        mu_daily * trading_days + 0.5 * (sigma_daily**2) * trading_days
+    )
     annualised_vol = float(sigma_daily * np.sqrt(trading_days))
     current_price = float(prices.iloc[-1])
 
     logger.info(
         "Market params | %s price=%.2f μ=%.4f σ=%.4f",
-        ticker, current_price, annualised_return, annualised_vol,
+        ticker,
+        current_price,
+        annualised_return,
+        annualised_vol,
     )
     return MarketData(
         ticker=ticker,
@@ -92,7 +98,7 @@ def _synthetic_data(ticker: str) -> MarketData:
         "AAPL": (185.0, 0.18, 0.28),
         "MSFT": (420.0, 0.22, 0.25),
         "NVDA": (900.0, 0.45, 0.55),
-        "SPY":  (510.0, 0.10, 0.17),
+        "SPY": (510.0, 0.10, 0.17),
         "TSLA": (250.0, 0.30, 0.65),
     }
     price, mu, sigma = defaults.get(ticker.upper(), (100.0, 0.12, 0.25))

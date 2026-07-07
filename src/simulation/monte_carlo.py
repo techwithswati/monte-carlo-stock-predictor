@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class SimulationModel(str, Enum):
-    GBM = "gbm"                    # Geometric Brownian Motion (baseline)
-    HESTON = "heston"              # Stochastic Volatility
+    GBM = "gbm"  # Geometric Brownian Motion (baseline)
+    HESTON = "heston"  # Stochastic Volatility
     JUMP_DIFFUSION = "jump_diffusion"  # Merton Jump-Diffusion
 
 
@@ -28,21 +28,23 @@ class SimulationModel(str, Enum):
 class SimulationConfig:
     ticker: str
     current_price: float
-    expected_return: float          # annualised μ
-    volatility: float               # annualised σ
+    expected_return: float  # annualised μ
+    volatility: float  # annualised σ
     trading_days: int = 252
     num_simulations: int = 10_000
-    confidence_levels: list = field(default_factory=lambda: [0.05, 0.25, 0.50, 0.75, 0.95])
+    confidence_levels: list = field(
+        default_factory=lambda: [0.05, 0.25, 0.50, 0.75, 0.95]
+    )
     model: SimulationModel = SimulationModel.GBM
     # Heston parameters
-    heston_kappa: float = 2.0       # mean reversion speed
-    heston_theta: float = 0.04      # long-run variance
-    heston_xi: float = 0.3          # vol-of-vol
-    heston_rho: float = -0.7        # correlation ρ
+    heston_kappa: float = 2.0  # mean reversion speed
+    heston_theta: float = 0.04  # long-run variance
+    heston_xi: float = 0.3  # vol-of-vol
+    heston_rho: float = -0.7  # correlation ρ
     # Jump-Diffusion parameters
-    jump_intensity: float = 5.0     # λ jumps/year
-    jump_mean: float = -0.02        # μ_J log-jump mean
-    jump_std: float = 0.05          # σ_J log-jump std
+    jump_intensity: float = 5.0  # λ jumps/year
+    jump_mean: float = -0.02  # μ_J log-jump mean
+    jump_std: float = 0.05  # σ_J log-jump std
     seed: Optional[int] = 42
 
 
@@ -53,11 +55,11 @@ class SimulationResult:
     current_price: float
     trading_days: int
     num_simulations: int
-    price_paths: np.ndarray          # shape: (num_simulations, trading_days+1)
+    price_paths: np.ndarray  # shape: (num_simulations, trading_days+1)
     final_prices: np.ndarray
     percentiles: dict
-    var_95: float                    # Value-at-Risk 95%
-    cvar_95: float                   # Conditional VaR (Expected Shortfall)
+    var_95: float  # Value-at-Risk 95%
+    cvar_95: float  # Conditional VaR (Expected Shortfall)
     sharpe_ratio: float
     max_drawdown: float
     prob_profit: float
@@ -94,7 +96,10 @@ class MonteCarloEngine:
             np.random.seed(config.seed)
         logger.info(
             "MonteCarloEngine initialised | ticker=%s model=%s sims=%d days=%d",
-            config.ticker, config.model.value, config.num_simulations, config.trading_days,
+            config.ticker,
+            config.model.value,
+            config.num_simulations,
+            config.trading_days,
         )
 
     # ------------------------------------------------------------------
@@ -117,7 +122,9 @@ class MonteCarloEngine:
         result = self._compute_statistics(paths, time.perf_counter() - start)
         logger.info(
             "Simulation complete | elapsed=%.3fs var95=%.4f prob_profit=%.2f%%",
-            result.elapsed_seconds, result.var_95, result.prob_profit * 100,
+            result.elapsed_seconds,
+            result.var_95,
+            result.prob_profit * 100,
         )
         return result
 
@@ -132,12 +139,12 @@ class MonteCarloEngine:
         n, t = cfg.num_simulations, cfg.trading_days
 
         # Drift and diffusion coefficients
-        drift = (cfg.expected_return - 0.5 * cfg.volatility ** 2) * dt
+        drift = (cfg.expected_return - 0.5 * cfg.volatility**2) * dt
         diffusion = cfg.volatility * np.sqrt(dt)
 
         # Vectorised log-returns matrix
         Z = np.random.standard_normal((n, t))
-        log_returns = drift + diffusion * Z          # (n, t)
+        log_returns = drift + diffusion * Z  # (n, t)
         log_price_paths = np.cumsum(log_returns, axis=1)
 
         paths = cfg.current_price * np.exp(
@@ -157,22 +164,27 @@ class MonteCarloEngine:
         dt = 1 / 252
         n, t = cfg.num_simulations, cfg.trading_days
 
-        kappa, theta, xi, rho = cfg.heston_kappa, cfg.heston_theta, cfg.heston_xi, cfg.heston_rho
+        kappa, theta, xi, rho = (
+            cfg.heston_kappa,
+            cfg.heston_theta,
+            cfg.heston_xi,
+            cfg.heston_rho,
+        )
 
         S = np.zeros((n, t + 1))
         V = np.zeros((n, t + 1))
         S[:, 0] = cfg.current_price
-        V[:, 0] = cfg.volatility ** 2   # initial variance
+        V[:, 0] = cfg.volatility**2  # initial variance
 
         # Correlated Brownian increments
         Z1 = np.random.standard_normal((n, t))
         Z2 = np.random.standard_normal((n, t))
         W_S = Z1
-        W_V = rho * Z1 + np.sqrt(1 - rho ** 2) * Z2
+        W_V = rho * Z1 + np.sqrt(1 - rho**2) * Z2
 
         sqrt_dt = np.sqrt(dt)
         for i in range(t):
-            v_pos = np.maximum(V[:, i], 0)          # full truncation
+            v_pos = np.maximum(V[:, i], 0)  # full truncation
             sqrt_v = np.sqrt(v_pos)
 
             S[:, i + 1] = S[:, i] * np.exp(
@@ -197,9 +209,9 @@ class MonteCarloEngine:
         n, t = cfg.num_simulations, cfg.trading_days
 
         lam, mu_j, sig_j = cfg.jump_intensity, cfg.jump_mean, cfg.jump_std
-        k_bar = np.exp(mu_j + 0.5 * sig_j ** 2) - 1  # expected jump size
+        k_bar = np.exp(mu_j + 0.5 * sig_j**2) - 1  # expected jump size
 
-        drift = (cfg.expected_return - lam * k_bar - 0.5 * cfg.volatility ** 2) * dt
+        drift = (cfg.expected_return - lam * k_bar - 0.5 * cfg.volatility**2) * dt
         diffusion = cfg.volatility * np.sqrt(dt)
 
         Z = np.random.standard_normal((n, t))
@@ -210,11 +222,24 @@ class MonteCarloEngine:
         # Log-normal jump magnitudes — vectorised across max possible jumps
         max_jumps = int(N_jumps.max()) + 1
         J_sizes = np.random.normal(mu_j, sig_j, size=(n, t, max_jumps))
-        jump_returns = np.array([
-            np.sum(J_sizes[:, :, :N_jumps[i, j]] if N_jumps[i, j] > 0 else np.zeros((n, t, 0)), axis=2)[i, j]
-            if False else 0  # placeholder reshape below
-            for i in range(1) for j in range(1)
-        ])
+        jump_returns = np.array(
+            [
+                (
+                    np.sum(
+                        (
+                            J_sizes[:, :, : N_jumps[i, j]]
+                            if N_jumps[i, j] > 0
+                            else np.zeros((n, t, 0))
+                        ),
+                        axis=2,
+                    )[i, j]
+                    if False
+                    else 0
+                )  # placeholder reshape below
+                for i in range(1)
+                for j in range(1)
+            ]
+        )
         # Efficient vectorised jump aggregation
         jump_mask = np.arange(max_jumps)[None, None, :] < N_jumps[:, :, None]
         jump_returns = (J_sizes * jump_mask).sum(axis=2)
@@ -230,14 +255,15 @@ class MonteCarloEngine:
     # Statistics
     # ------------------------------------------------------------------
 
-    def _compute_statistics(self, paths: np.ndarray, elapsed: float) -> SimulationResult:
+    def _compute_statistics(
+        self, paths: np.ndarray, elapsed: float
+    ) -> SimulationResult:
         cfg = self.cfg
         final = paths[:, -1]
 
         # Percentiles
         percentiles = {
-            lvl: float(np.percentile(final, lvl * 100))
-            for lvl in cfg.confidence_levels
+            lvl: float(np.percentile(final, lvl * 100)) for lvl in cfg.confidence_levels
         }
 
         # Returns for risk metrics
@@ -252,7 +278,11 @@ class MonteCarloEngine:
         daily_rets = np.diff(paths, axis=1) / paths[:, :-1]
         mean_daily = daily_rets.mean()
         std_daily = daily_rets.std()
-        sharpe = float((mean_daily - rf_daily) / std_daily * np.sqrt(252)) if std_daily > 0 else 0.0
+        sharpe = (
+            float((mean_daily - rf_daily) / std_daily * np.sqrt(252))
+            if std_daily > 0
+            else 0.0
+        )
 
         # Max Drawdown (mean path)
         mean_path = paths.mean(axis=0)

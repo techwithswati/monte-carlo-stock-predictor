@@ -19,6 +19,7 @@ from src.simulation.monte_carlo import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def base_config() -> SimulationConfig:
     return SimulationConfig(
@@ -43,6 +44,7 @@ def quick_config(base_config) -> SimulationConfig:
 # GBM tests
 # ---------------------------------------------------------------------------
 
+
 class TestGBM:
     def test_shape(self, base_config):
         result = MonteCarloEngine(base_config).run()
@@ -57,7 +59,9 @@ class TestGBM:
 
     def test_all_prices_positive(self, base_config):
         result = MonteCarloEngine(base_config).run()
-        assert (result.price_paths > 0).all(), "GBM must produce strictly positive prices"
+        assert (
+            result.price_paths > 0
+        ).all(), "GBM must produce strictly positive prices"
 
     def test_mean_path_within_range(self, base_config):
         """Log-normal mean should be S0·exp(μT) within 10% tolerance."""
@@ -95,9 +99,20 @@ class TestGBM:
     def test_to_dict_keys(self, base_config):
         result = MonteCarloEngine(base_config).run()
         d = result.to_dict()
-        required = {"ticker", "model", "current_price", "trading_days",
-                    "num_simulations", "percentiles", "var_95", "cvar_95",
-                    "sharpe_ratio", "max_drawdown", "prob_profit", "elapsed_seconds"}
+        required = {
+            "ticker",
+            "model",
+            "current_price",
+            "trading_days",
+            "num_simulations",
+            "percentiles",
+            "var_95",
+            "cvar_95",
+            "sharpe_ratio",
+            "max_drawdown",
+            "prob_profit",
+            "elapsed_seconds",
+        }
         assert required.issubset(d.keys())
 
     def test_elapsed_positive(self, quick_config):
@@ -109,6 +124,7 @@ class TestGBM:
 # Heston tests
 # ---------------------------------------------------------------------------
 
+
 class TestHeston:
     def test_positive_prices(self, base_config):
         base_config.model = SimulationModel.HESTON
@@ -118,7 +134,10 @@ class TestHeston:
     def test_shape(self, base_config):
         base_config.model = SimulationModel.HESTON
         result = MonteCarloEngine(base_config).run()
-        assert result.price_paths.shape == (base_config.num_simulations, base_config.trading_days + 1)
+        assert result.price_paths.shape == (
+            base_config.num_simulations,
+            base_config.trading_days + 1,
+        )
 
     def test_initial_price(self, base_config):
         base_config.model = SimulationModel.HESTON
@@ -135,6 +154,7 @@ class TestHeston:
 # Jump-Diffusion tests
 # ---------------------------------------------------------------------------
 
+
 class TestJumpDiffusion:
     def test_positive_prices(self, base_config):
         base_config.model = SimulationModel.JUMP_DIFFUSION
@@ -146,13 +166,15 @@ class TestJumpDiffusion:
         gbm = MonteCarloEngine(base_config).run()
         base_config.model = SimulationModel.JUMP_DIFFUSION
         jd = MonteCarloEngine(base_config).run()
-        assert jd.var_95 <= gbm.var_95 or jd.cvar_95 <= gbm.cvar_95, \
-            "Jump-diffusion should have fatter downside tails"
+        assert (
+            jd.var_95 <= gbm.var_95 or jd.cvar_95 <= gbm.cvar_95
+        ), "Jump-diffusion should have fatter downside tails"
 
 
 # ---------------------------------------------------------------------------
 # Edge-case tests
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_single_day(self, base_config):

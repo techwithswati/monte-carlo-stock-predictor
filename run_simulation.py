@@ -17,6 +17,7 @@ import os
 import sys
 
 import matplotlib
+
 matplotlib.use("Agg")  # MUST come before pyplot import
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -26,7 +27,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.data.fetcher import fetch_market_data
-from src.simulation.monte_carlo import MonteCarloEngine, SimulationConfig, SimulationModel
+from src.simulation.monte_carlo import (
+    MonteCarloEngine,
+    SimulationConfig,
+    SimulationModel,
+)
 from src.utils.logger import setup_logging
 
 setup_logging(level="INFO")
@@ -37,20 +42,27 @@ logger = logging.getLogger(__name__)
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Monte Carlo Stock Price Simulation — PE-Grade Engine",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--ticker", default="AAPL", help="Yahoo Finance ticker")
-    parser.add_argument("--days", type=int, default=252, help="Trading days to simulate")
+    parser.add_argument(
+        "--days", type=int, default=252, help="Trading days to simulate"
+    )
     parser.add_argument("--sims", type=int, default=10_000, help="Number of MC paths")
     parser.add_argument(
-        "--model", choices=["gbm", "heston", "jump_diffusion"], default="gbm",
-        help="Stochastic model"
+        "--model",
+        choices=["gbm", "heston", "jump_diffusion"],
+        default="gbm",
+        help="Stochastic model",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--output-dir", default="outputs", help="Directory for charts & JSON")
+    parser.add_argument(
+        "--output-dir", default="outputs", help="Directory for charts & JSON"
+    )
     parser.add_argument("--no-chart", action="store_true", help="Skip chart generation")
     return parser.parse_args()
 
@@ -122,12 +134,21 @@ def plot_simulation(result, output_dir: str) -> str:
         color=PALETTE["accent"],
         alpha=0.8,
         orientation="horizontal",
-        density=True
+        density=True,
     )
-    ax2.axhline(result.current_price, color=PALETTE["red"], lw=2, ls="--", label="Current")
-    ax2.axhline(np.percentile(result.final_prices, 5), color=PALETTE["orange"],
-                lw=1.5, ls=":", label="P5 / P95")
-    ax2.axhline(np.percentile(result.final_prices, 95), color=PALETTE["green"], lw=1.5, ls=":")
+    ax2.axhline(
+        result.current_price, color=PALETTE["red"], lw=2, ls="--", label="Current"
+    )
+    ax2.axhline(
+        np.percentile(result.final_prices, 5),
+        color=PALETTE["orange"],
+        lw=1.5,
+        ls=":",
+        label="P5 / P95",
+    )
+    ax2.axhline(
+        np.percentile(result.final_prices, 95), color=PALETTE["green"], lw=1.5, ls=":"
+    )
     _style_ax(ax2, "Final Price Distribution", "Density", "Price (USD)")
     ax2.legend(fontsize=7, framealpha=0.3)
 
@@ -155,27 +176,33 @@ def plot_simulation(result, output_dir: str) -> str:
     }
     ax4.axis("off")
     y = 0.95
-    ax4.text(0.02, y, "Risk Metrics", fontsize=13, fontweight="bold",
-             color=PALETTE["accent"], transform=ax4.transAxes)
+    ax4.text(
+        0.02,
+        y,
+        "Risk Metrics",
+        fontsize=13,
+        fontweight="bold",
+        color=PALETTE["accent"],
+        transform=ax4.transAxes,
+    )
     y -= 0.12
     for label, val in metrics.items():
         color = (
             PALETTE["red"]
             if "VaR" in label or "Drawdown" in label
-            else PALETTE["green"]
-            if "Profit" in label
-            else PALETTE["text"]
+            else PALETTE["green"] if "Profit" in label else PALETTE["text"]
         )
         ax4.text(
-            0.02,
+            0.02, y, label, fontsize=10, color=PALETTE["text"], transform=ax4.transAxes
+        )
+        ax4.text(
+            0.65,
             y,
-            label,
+            val,
             fontsize=10,
-            color=PALETTE["text"],
-            transform=ax4.transAxes
-        )
-        ax4.text(
-            0.65, y, val, fontsize=10, fontweight="bold", color=color, transform=ax4.transAxes
+            fontweight="bold",
+            color=color,
+            transform=ax4.transAxes,
         )
         y -= 0.1
     ax4.set_facecolor(PALETTE["bg"])
@@ -183,17 +210,56 @@ def plot_simulation(result, output_dir: str) -> str:
     # ── 5. Percentile Table ────────────────────────────────────────────
     ax5 = fig.add_subplot(gs[1, 2])
     ax5.axis("off")
-    ax5.text(0.02, 0.95, "Price Targets", fontsize=13, fontweight="bold",
-             color=PALETTE["accent"], transform=ax5.transAxes)
-    ax5.text(0.02, 0.84, "Percentile", fontsize=9, color=PALETTE["text"], transform=ax5.transAxes)
-    ax5.text(0.55, 0.84, "Price (USD)", fontsize=9, color=PALETTE["text"], transform=ax5.transAxes)
+    ax5.text(
+        0.02,
+        0.95,
+        "Price Targets",
+        fontsize=13,
+        fontweight="bold",
+        color=PALETTE["accent"],
+        transform=ax5.transAxes,
+    )
+    ax5.text(
+        0.02,
+        0.84,
+        "Percentile",
+        fontsize=9,
+        color=PALETTE["text"],
+        transform=ax5.transAxes,
+    )
+    ax5.text(
+        0.55,
+        0.84,
+        "Price (USD)",
+        fontsize=9,
+        color=PALETTE["text"],
+        transform=ax5.transAxes,
+    )
     y = 0.73
     for lvl, price in result.percentiles.items():
         pct = float(lvl) * 100
-        color = PALETTE["green"] if pct > 50 else PALETTE["red"] if pct < 25 else PALETTE["text"]
-        ax5.text(0.02, y, f"P{pct:.0f}", fontsize=10, color=PALETTE["text"], transform=ax5.transAxes)
-        ax5.text(0.55, y, f"${price:,.2f}", fontsize=10, fontweight="bold",
-                 color=color, transform=ax5.transAxes)
+        color = (
+            PALETTE["green"]
+            if pct > 50
+            else PALETTE["red"] if pct < 25 else PALETTE["text"]
+        )
+        ax5.text(
+            0.02,
+            y,
+            f"P{pct:.0f}",
+            fontsize=10,
+            color=PALETTE["text"],
+            transform=ax5.transAxes,
+        )
+        ax5.text(
+            0.55,
+            y,
+            f"${price:,.2f}",
+            fontsize=10,
+            fontweight="bold",
+            color=color,
+            transform=ax5.transAxes,
+        )
         y -= 0.1
     ax5.set_facecolor(PALETTE["bg"])
 
@@ -204,7 +270,7 @@ def plot_simulation(result, output_dir: str) -> str:
         ha="center",
         fontsize=8,
         color="#6e7681",
-        style="italic"
+        style="italic",
     )
 
     path = os.path.join(output_dir, f"{result.ticker}_{result.model}_simulation.png")
@@ -228,18 +294,27 @@ def _style_ax(ax, title, xlabel, ylabel):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     args = parse_args()
 
     logger.info("=== Monte Carlo Stock Predictor ===")
     logger.info(
-        "Ticker=%s | Model=%s | Days=%d | Sims=%d", args.ticker, args.model, args.days, args.sims
+        "Ticker=%s | Model=%s | Days=%d | Sims=%d",
+        args.ticker,
+        args.model,
+        args.days,
+        args.sims,
     )
 
     # Fetch market data
     market = fetch_market_data(args.ticker)
-    logger.info("Current price: $%.2f | μ=%.4f | σ=%.4f",
-                market.current_price, market.expected_return, market.volatility)
+    logger.info(
+        "Current price: $%.2f | μ=%.4f | σ=%.4f",
+        market.current_price,
+        market.expected_return,
+        market.volatility,
+    )
 
     # Configure & run
     config = SimulationConfig(
@@ -280,7 +355,9 @@ def main():
 
     # Save JSON
     os.makedirs(args.output_dir, exist_ok=True)
-    json_path = os.path.join(args.output_dir, f"{args.ticker}_{args.model}_results.json")
+    json_path = os.path.join(
+        args.output_dir, f"{args.ticker}_{args.model}_results.json"
+    )
     with open(json_path, "w") as f:
         json.dump(summary, f, indent=2)
     logger.info("Results saved → %s", json_path)
